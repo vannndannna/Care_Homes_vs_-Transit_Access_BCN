@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VIZ 4 — Last Mile: Care Homes × Metro · Barcelona</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- ① Leaflet CSS must load before JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+</head>
+<body>
+
+<style>
+:root{--bg:#060a06;--bg2:#0d130d;--bg3:#131a13;--bg4:#1a231a;--bdr:rgba(255,255,255,0.06);--bdr2:rgba(255,255,255,0.11);--grn:#4ade80;--blu:#3b82f6;--amb:#fbbf24;--orn:#f97316;--red:#ef4444;--gry:#9ca3af;--txt:#e8f5e8;--txt2:#a8bfa8;--mut:#4d6b4d}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font-family:'DM Mono',monospace;font-size:12px;line-height:1.5}
+.shell{display:grid;grid-template-rows:54px 1fr;grid-template-columns:1fr 400px;height:100vh}
+/* TOPBAR */
+.topbar{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:var(--bg2);border-bottom:1px solid var(--bdr);gap:12px;flex-wrap:nowrap}
+.tb-title{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;color:var(--grn);white-space:nowrap;letter-spacing:-.3px}
+.tb-sep{color:var(--mut);margin:0 8px}
+.tb-sub{font-size:10px;color:var(--mut);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+.tb-kpis{display:flex;border-left:1px solid var(--bdr);flex-shrink:0}
+.kpi{padding:0 14px;border-right:1px solid var(--bdr);display:flex;flex-direction:column;justify-content:center}
+.kpi-v{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;line-height:1}
+.kpi-l{font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:.07em;margin-top:2px}
+.tags{display:flex;gap:5px;flex-shrink:0}
+.tag{font-size:9px;padding:2px 7px;border:1px solid var(--bdr);border-radius:3px;color:var(--mut)}
+/* MAP */
+.mapwrap{position:relative;overflow:hidden}
+#map{width:100%;height:100%;background:#030805}
+.leaflet-tile{filter:saturate(.18) brightness(.42) hue-rotate(105deg) contrast(1.15)}
+.leaflet-container{background:#020604!important}
+.leaflet-control-zoom a{background:var(--bg3)!important;color:var(--mut)!important;border-color:var(--bdr)!important}
+.leaflet-control-zoom a:hover{color:var(--grn)!important}
+/* LAYER TOGGLE */
+.map-ctrl{position:absolute;top:12px;left:12px;z-index:1000;background:rgba(6,10,6,.93);border:1px solid var(--bdr2);border-radius:5px;padding:8px 11px;font-size:10px}
+.ctrl-hd{font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:.09em;margin-bottom:6px}
+.ctrl-row{display:flex;align-items:center;gap:7px;color:var(--txt2);cursor:pointer;padding:1px 0;user-select:none}
+.ctrl-row:hover{color:var(--txt)}
+.ctrl-row input{cursor:pointer;accent-color:var(--grn)}
+/* LEGEND */
+.map-legend{position:absolute;bottom:16px;left:12px;z-index:1000;background:rgba(6,10,6,.94);border:1px solid var(--bdr2);border-radius:5px;padding:10px 13px;min-width:190px}
+.leg-hd{font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px}
+.leg-row{display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:10px;color:var(--txt2)}
+.leg-sq{width:11px;height:9px;border-radius:2px;flex-shrink:0}
+.leg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.leg-sep{border-top:1px solid var(--bdr);margin:6px 0}
+/* POPUP */
+.custom-popup .leaflet-popup-content-wrapper{background:rgba(6,10,6,.97);border:1px solid rgba(74,222,128,.18);border-radius:6px;color:var(--txt);font-family:'DM Mono',monospace;font-size:11px;min-width:220px;max-width:280px;box-shadow:0 0 16px rgba(74,222,128,.07)}
+.custom-popup .leaflet-popup-tip{background:rgba(6,10,6,.97)}
+.custom-popup .leaflet-popup-close-button{color:var(--mut)!important;top:6px!important;right:8px!important}
+.pu-name{font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;color:var(--grn);margin-bottom:6px;padding-right:14px;line-height:1.3}
+.pu-row{color:var(--mut);margin-bottom:2px;font-size:10px}
+.pu-row span{color:var(--txt2)}
+.pu-badge{display:inline-block;margin-top:5px;font-size:9px;padding:2px 7px;border-radius:3px;font-weight:500;letter-spacing:.05em;text-transform:uppercase}
+/* SIDEBAR */
+.sidebar{background:var(--bg2);border-left:1px solid var(--bdr);display:flex;flex-direction:column;overflow:hidden}
+.sb-scroll{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--bdr2) transparent}
+.sb-scroll::-webkit-scrollbar{width:3px}
+.sb-scroll::-webkit-scrollbar-thumb{background:var(--bdr2);border-radius:2px}
+.s-sec{padding:13px 15px;border-bottom:1px solid var(--bdr)}
+.s-hd{font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:.1em;margin-bottom:9px;display:flex;align-items:center;gap:8px}
+.s-hd-line{flex:1;height:1px;background:var(--bdr)}
+/* BADGES */
+.badge{display:inline-flex;align-items:center;font-size:9px;padding:2px 8px;border-radius:3px;text-transform:uppercase;letter-spacing:.05em;font-weight:500}
+.b-excellent{background:rgba(74,222,128,.1);color:#4ade80;border:1px solid rgba(74,222,128,.22)}
+.b-good{background:rgba(59,130,246,.1);color:#93c5fd;border:1px solid rgba(59,130,246,.22)}
+.b-moderate{background:rgba(251,191,36,.1);color:#fbbf24;border:1px solid rgba(251,191,36,.22)}
+.b-poor{background:rgba(249,115,22,.1);color:#f97316;border:1px solid rgba(249,115,22,.22)}
+.b-critical{background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.22)}
+/* FILTER PILLS */
+.frow{display:flex;gap:5px;flex-wrap:wrap}
+.fpill{font-size:9px;padding:3px 9px;border-radius:3px;border:1px solid var(--bdr);color:var(--mut);cursor:pointer;background:transparent;transition:all .12s;font-family:'DM Mono',monospace;letter-spacing:.04em}
+.fpill:hover{border-color:var(--bdr2);color:var(--txt2)}
+.fpill.on{background:var(--grn);border-color:var(--grn);color:var(--bg)}
+/* DISTRICT RANKING */
+.rank-list{display:flex;flex-direction:column;gap:5px}
+.rank-card{display:flex;align-items:center;gap:9px;padding:8px 10px;background:var(--bg3);border:1px solid var(--bdr);border-radius:4px;cursor:pointer;transition:border-color .15s,background .15s}
+.rank-card:hover{border-color:rgba(74,222,128,.28);background:var(--bg4)}
+.rank-card.active{border-color:var(--grn);background:rgba(74,222,128,.04)}
+.rk-num{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;min-width:20px;text-align:center;line-height:1}
+.rk-body{flex:1;min-width:0}
+.rk-name{font-size:11px;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rk-detail{font-size:9px;color:var(--mut);margin-top:2px}
+.rk-bar-t{width:100%;height:2px;background:var(--bdr);border-radius:1px;margin-top:4px}
+.rk-bar-f{height:2px;border-radius:1px}
+.rk-val{font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;min-width:44px;text-align:right;white-space:nowrap}
+/* INSIGHT */
+.insight{background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.18);border-radius:4px;padding:9px 11px;font-size:10px;color:var(--txt2);line-height:1.65}
+.insight strong{color:var(--red);font-weight:500}
+.insight.grn{background:rgba(74,222,128,.04);border-color:rgba(74,222,128,.18)}
+.insight.grn strong{color:var(--grn)}
+.insight.amb{background:rgba(251,191,36,.04);border-color:rgba(251,191,36,.18)}
+.insight.amb strong{color:var(--amb)}
+/* HOME LIST */
+.home-list{display:flex;flex-direction:column;gap:4px;max-height:260px;overflow-y:auto}
+.home-item{display:flex;align-items:flex-start;gap:8px;padding:6px 8px;background:var(--bg3);border:1px solid var(--bdr);border-radius:4px;cursor:pointer;transition:border-color .12s}
+.home-item:hover{border-color:rgba(255,255,255,.14)}
+.hi-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:3px}
+.hi-body{flex:1;min-width:0}
+.hi-name{font-size:10px;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hi-sub{font-size:9px;color:var(--mut);margin-top:1px}
+.hi-dist{font-size:10px;font-family:'Space Grotesk',sans-serif;font-weight:600;white-space:nowrap;flex-shrink:0}
+/* CHARTS */
+.chart-box{position:relative;width:100%}
+.donut-pair{display:grid;grid-template-columns:120px 1fr;gap:10px;align-items:center}
+.dl-row{display:flex;align-items:center;gap:7px;font-size:9px;color:var(--txt2);margin-bottom:4px}
+.dl-sw{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.dl-c{margin-left:auto;color:var(--mut)}
+/* FOOTER */
+.sb-foot{padding:7px 15px;font-size:9px;color:var(--mut);border-top:1px solid var(--bdr);display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;letter-spacing:.05em}
+</style>
+
+<div class="shell">
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <div style="display:flex;align-items:baseline;flex-shrink:0">
+    <span class="tb-title">Last Mile — Care Homes × Metro</span>
+    <span class="tb-sep">|</span>
+    <span class="tb-sub">Transit accessibility · Barcelona</span>
+  </div>
+  <div class="tb-kpis">
+    <div class="kpi"><div class="kpi-v" style="color:var(--grn)">230</div><div class="kpi-l">care homes</div></div>
+    <div class="kpi"><div class="kpi-v" style="color:var(--blu)">125</div><div class="kpi-l">within 800m</div></div>
+    <div class="kpi"><div class="kpi-v" style="color:var(--red)">105</div><div class="kpi-l">transit deserts</div></div>
+    <div class="kpi"><div class="kpi-v" style="color:var(--amb)">45.7%</div><div class="kpi-l">underserved</div></div>
+    <div class="kpi"><div class="kpi-v" style="color:var(--gry)">6,295m</div><div class="kpi-l">worst case</div></div>
+  </div>
+  <div class="tags">
+    <span class="tag">30 metro stops</span>
+    <span class="tag">69,978 buildings</span>
+    <span class="tag">14,831 streets</span>
+    <span class="tag">EPSG:25831</span>
+  </div>
+</header>
+
+<!-- MAP -->
+<div class="mapwrap">
+  <div id="map"></div>
+
+  <div class="map-ctrl">
+    <div class="ctrl-hd">Layers</div>
+    <label class="ctrl-row"><input type="checkbox" id="tog-metro" checked> Metro stations</label>
+    <label class="ctrl-row"><input type="checkbox" id="tog-homes" checked> Care homes</label>
+    <label class="ctrl-row"><input type="checkbox" id="tog-zones" checked> 800m walk halos</label>
+  </div>
+
+  <div class="map-legend">
+    <div class="leg-hd">Buildings — avg_dist to metro</div>
+    <div class="leg-row"><div class="leg-sq" style="background:#2a2a2a;border:1px solid #333"></div>Outside coverage</div>
+    <div class="leg-row"><div class="leg-sq" style="background:#4ade80"></div>Excellent ≤ 400 m</div>
+    <div class="leg-row"><div class="leg-sq" style="background:#3b82f6"></div>Good 400–800 m</div>
+    <div class="leg-row"><div class="leg-sq" style="background:#fbbf24"></div>Moderate 800–1200 m</div>
+    <div class="leg-row"><div class="leg-sq" style="background:#f97316"></div>Poor 1200–2000 m</div>
+    <div class="leg-row"><div class="leg-sq" style="background:#ef4444"></div>Critical > 2000 m</div>
+    <div class="leg-sep"></div>
+    <div class="leg-row"><div class="leg-dot" style="background:#e8f5e8;box-shadow:0 0 5px rgba(74,222,128,.5)"></div>Metro station</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#4ade80;box-shadow:0 0 4px rgba(74,222,128,.4)"></div>Care home — excellent</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#fbbf24;box-shadow:0 0 4px rgba(251,191,36,.4)"></div>Care home — moderate/poor</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#ef4444;box-shadow:0 0 4px rgba(239,68,68,.5)"></div>Care home — critical</div>
+  </div>
+</div>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+<div class="sb-scroll">
+
+  <!-- FILTER -->
+  <div class="s-sec">
+    <div class="s-hd">Filter by access tier <div class="s-hd-line"></div></div>
+    <div class="frow" id="filterRow">
+      <button class="fpill on" data-tier="all">All 230</button>
+      <button class="fpill" data-tier="Excellent">Excellent 54</button>
+      <button class="fpill" data-tier="Good">Good 71</button>
+      <button class="fpill" data-tier="Moderate">Moderate 25</button>
+      <button class="fpill" data-tier="Poor">Poor 32</button>
+      <button class="fpill" data-tier="Critical">Critical 48</button>
+    </div>
+  </div>
+
+  <!-- KEY INSIGHT -->
+  <div class="s-sec">
+    <div class="insight">
+      <strong>45.7% of care homes (105/230)</strong> lie beyond 1,200 m from the nearest metro — the standard walkability threshold. The most isolated facility, <strong>Residència Vallbona</strong> in Nou Barris, is <strong>6,295 m</strong> from a station. Horta-Guinardó and Sarrià-Sant Gervasi account for the majority of critical cases.
+    </div>
+  </div>
+
+  <!-- DISTRICT RANKING -->
+  <div class="s-sec">
+    <div class="s-hd">Districts — ranked by avg metro distance <div class="s-hd-line"></div></div>
+    <div class="rank-list" id="districtRank">
+      <div class="rank-card active" onclick="flyToDistrict(41.3808,2.1657,14,0)">
+        <div class="rk-num" style="color:#fbbf24">1</div>
+        <div class="rk-body">
+          <div class="rk-name">Ciutat Vella</div>
+          <div class="rk-detail">9 homes · avg 315 m · 0 critical</div>
+          <div class="rk-bar-t"><div class="rk-bar-f" style="width:100%;background:#4ade80"></div></div>
+        </div>
+        <div class="rk-val" style="color:#4ade80">315 m</div>
+      </div>
+      <div class="rank-card" onclick="flyToDistrict(41.3898,2.1541,13,1)">
+        <div class="rk-num" style="color:#e5e7eb">2</div>
+        <div class="rk-body">
+          <div class="rk-name">Eixample</div>
+          <div class="rk-detail">71 homes · avg 442 m · 0 critical</div>
+          <div class="rk-bar-t"><div class="rk-bar-f" style="width:88%;background:#4ade80"></div></div>
+        </div>
+        <div class="rk-val" style="color:#4ade80">442 m</div>
+      </div>
+      <div class="rank-card" onclick="flyToDistrict(41.3737,2.1488,13,2)">
+        <div class="rk-num" style="color:#cd7f32">3</div>
+        <div class="rk-body">
+          <div class="rk-name">Sants-Montjuïc</div>
+          <div class="rk-detail">11 homes · avg 628 m · 0 critical</div>
+          <div class="rk-bar-t"><div class="rk-bar-f" style="width:72%;background:#3b82f6"></div></div>
+        </div>
+        <div class="rk-val" style="color:#93c5fd">628 m</div>
+      </div>
+      <div class="rank-card" onclick="flyToDistrict(41.4029,2.1568,13,3)">
+        <div class="rk-num" style="color:var(--mut)">4</div>
+        <div class="rk-body">
+          <div class="rk-name">Gràcia</div>
+          <div class="rk-detail">25 homes · avg 922 m · 3 critical</div>
+          <div class="rk-bar-t"><div class="rk-bar-f" style="width:58%;background:#fbbf24"></div></div>
+        </div>
+        <div class="rk-val" style="color:#fbbf24">922 m</div>
+      </div>
+      <div class="rank-card" onclick="flyToDistrict(41.3903,2.1254,13,4)">
+        <div class="rk-num" style="color:var(--mut)">5</div>
+        <div class="rk-body">
+          <div class="rk-name">Les Corts</div>
+          <div class="rk-detail">3 homes · avg 1,263 m · 1 critical</div>
+          <div class="rk-bar-t"><div class="rk-bar-f" style="width:44%;background:#f97316"></div></div>
+        </div>
+        <div class="rk-val" style="color:#f97316">1,263 m</div>
+      </div>
+      <div class="rank-card" onclick="flyToDistrict(41.4102,2.1909,13,5)">
+        <div class="rk-num" style="color:var(--mut)">6</div>
+        <div class="rk-body">
+          <div class="rk-name">Sant Martí</div>
+          <div class="rk-detail">19 homes · avg 1,358 m · 2 critical</div>
+          <div class="rk-bar-t"><div class="rk-bar-f" style="width:38%;background:#f97316"></div></div>
+        </div>
+        <div class="rk-val" style="color:#f97316">1,358 m</div>
+      </div>
+      <div class="rank-card" onclick="flyToDistrict(41.4220,2.1640,12,6)">
+        <div class="rk-num" style="color:var(--mut)">7</div>
+        <div class="rk-body">
+          <div class="rk-name">Horta-Guinardó</div>
+          <div class="rk-detail">48 homes · avg 2,326 m · 32 critical ⚠</div>
+          <div class="rk-bar-t"><div class="rk-bar-f" style="width:26%;background:#ef4444"></div></div>
+        </div>
+        <div class="rk-val" style="color:#ef4444">2,326 m</div>
+      </div>
+      <div class="rank-card" onclick="flyToDistrict(41.4038,2.1312,12,7)">
+        <div class="rk-num" style="color:var(--mut)">8</div>
+        <div class="rk-body">
+          <div class="rk-name">Sarrià-Sant Gervasi</div>
+          <div class="rk-detail">27 homes · avg 2,635 m · 21 critical ⚠</div>
+          <div class="rk-bar-t"><div class="rk-bar-f" style="width:20%;background:#ef4444"></div></div>
+        </div>
+        <div class="rk-val" style="color:#ef4444">2,635 m</div>
+      </div>
+      <div class="rank-card" onclick="flyToDistrict(41.4339,2.1900,12,8)">
+        <div class="rk-num" style="color:var(--mut)">9</div>
+        <div class="rk-body">
+          <div class="rk-name">Sant Andreu</div>
+          <div class="rk-detail">6 homes · avg 3,137 m · 6 critical ⚠</div>
+          <div class="rk-bar-t"><div class="rk-bar-f" style="width:14%;background:#ef4444"></div></div>
+        </div>
+        <div class="rk-val" style="color:#ef4444">3,137 m</div>
+      </div>
+      <div class="rank-card" onclick="flyToDistrict(41.4381,2.1720,12,9)">
+        <div class="rk-num" style="color:var(--mut)">10</div>
+        <div class="rk-body">
+          <div class="rk-name">Nou Barris</div>
+          <div class="rk-detail">11 homes · avg 3,622 m · 11 critical ⚠</div>
+          <div class="rk-bar-t"><div class="rk-bar-f" style="width:8%;background:#ef4444"></div></div>
+        </div>
+        <div class="rk-val" style="color:#ef4444">3,622 m</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DISTRIBUTION DONUT -->
+  <div class="s-sec">
+    <div class="s-hd">Access tier distribution — 230 homes <div class="s-hd-line"></div></div>
+    <div class="donut-pair">
+      <div class="chart-box" style="height:125px"><canvas id="donutChart"></canvas></div>
+      <div>
+        <div class="dl-row"><div class="dl-sw" style="background:#4ade80"></div>Excellent ≤400m<span class="dl-c">54</span></div>
+        <div class="dl-row"><div class="dl-sw" style="background:#3b82f6"></div>Good 400–800m<span class="dl-c">71</span></div>
+        <div class="dl-row"><div class="dl-sw" style="background:#fbbf24"></div>Moderate 800–1200m<span class="dl-c">25</span></div>
+        <div class="dl-row"><div class="dl-sw" style="background:#f97316"></div>Poor 1200–2000m<span class="dl-c">32</span></div>
+        <div class="dl-row"><div class="dl-sw" style="background:#ef4444"></div>Critical >2000m<span class="dl-c">48</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DISTANCE HISTOGRAM -->
+  <div class="s-sec">
+    <div class="s-hd">Distance histogram — 500m bins <div class="s-hd-line"></div></div>
+    <div class="chart-box" style="height:110px"><canvas id="histChart"></canvas></div>
+  </div>
+
+  <!-- RADAR -->
+  <div class="s-sec">
+    <div class="s-hd">District comparison — radar <div class="s-hd-line"></div></div>
+    <div style="display:flex;gap:12px;margin-bottom:8px;flex-wrap:wrap">
+      <span style="font-size:9px;color:var(--mut);display:flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#4ade80;display:inline-block;border-radius:1px"></span>Access score (inverse)</span>
+      <span style="font-size:9px;color:var(--mut);display:flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#ef4444;display:inline-block;border-radius:1px;border-top:1px dashed #ef4444"></span>Critical count</span>
+    </div>
+    <div class="chart-box" style="height:170px"><canvas id="radarChart"></canvas></div>
+  </div>
+
+  <!-- WORST CASES -->
+  <div class="s-sec">
+    <div class="s-hd">Most isolated homes — top 7 critical <div class="s-hd-line"></div></div>
+    <div class="chart-box" style="height:105px"><canvas id="critChart"></canvas></div>
+    <div class="insight" style="margin-top:9px">
+      These 7 homes exceed <strong>3,400 m</strong> straight-line to metro. Network walking distance will be <strong>30–50% higher</strong> due to Barcelona's hilly northern terrain. No viable last-mile solution exists without new infrastructure.
+    </div>
+  </div>
+
+  <!-- CARE HOME LIST -->
+  <div class="s-sec">
+    <div class="s-hd">Browse all care homes <div class="s-hd-line"></div></div>
+    <div class="home-list" id="homeList"></div>
+  </div>
+
+  <!-- BUILDING COVERAGE -->
+  <div class="s-sec">
+    <div class="s-hd">Building stock — 69,978 footprints <div class="s-hd-line"></div></div>
+    <div class="chart-box" style="height:95px"><canvas id="bldgChart"></canvas></div>
+    <div class="insight grn" style="margin-top:9px">
+      <strong>23.2% of buildings (16,241)</strong> sit within 400m of metro — concentrated in the dense Eixample grid. The outer <strong>12.3% (8,613 buildings)</strong> fall entirely outside the 30-stop service radius.
+    </div>
+  </div>
+
+</div><!-- sb-scroll -->
+<div class="sb-foot">
+  <span>Data: Ajuntament de Barcelona Open Data · OSM · QGIS 3.44</span>
+  <span>EPSG:25831 · straight-line dist.</span>
+</div>
+</aside>
+
+</div><!-- .shell -->
+
+<!-- ② Leaflet JS after CSS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
+<script>
+// ── ALL DATA ──────────────────────────────────────────────────────────
+var metroData = [
+  {fid:1,name:"Plaça de Sants",lat:41.374043,lon:2.125103},
+  {fid:2,name:"Hostafrancs",lat:41.375642,lon:2.133967},
+  {fid:3,name:"Rocafort",lat:41.376428,lon:2.142806},
+  {fid:4,name:"Urgell",lat:41.377831,lon:2.149723},
+  {fid:5,name:"Universitat",lat:41.379242,lon:2.157837},
+  {fid:6,name:"Urquinaona",lat:41.383834,lon:2.169977},
+  {fid:7,name:"Arc de Triomf",lat:41.386613,lon:2.180706},
+  {fid:8,name:"Marina",lat:41.387581,lon:2.190262},
+  {fid:9,name:"Clot",lat:41.388574,lon:2.203407},
+  {fid:10,name:"Paral·lel",lat:41.370202,lon:2.15341},
+  {fid:11,name:"Sant Antoni",lat:41.377398,lon:2.152121},
+  {fid:12,name:"Passeig de Gràcia",lat:41.383851,lon:2.172369},
+  {fid:13,name:"Tetuan",lat:41.389323,lon:2.181868},
+  {fid:14,name:"Bogatell",lat:41.391259,lon:2.200982},
+  {fid:15,name:"Drassanes",lat:41.372082,lon:2.164147},
+  {fid:16,name:"Liceu",lat:41.37481,lon:2.1677},
+  {fid:17,name:"Catalunya",lat:41.382024,lon:2.168804},
+  {fid:18,name:"Diagonal",lat:41.392849,lon:2.171058},
+  {fid:19,name:"Fontana",lat:41.397344,lon:2.169805},
+  {fid:20,name:"Lesseps",lat:41.40273,lon:2.167344},
+  {fid:21,name:"Vallcarca",lat:41.408108,lon:2.163686},
+  {fid:22,name:"Barceloneta",lat:41.374896,lon:2.179657},
+  {fid:23,name:"Ciutadella/V.Olímpica",lat:41.380393,lon:2.192743},
+  {fid:24,name:"Poblenou",lat:41.386805,lon:2.208212},
+  {fid:25,name:"Entença",lat:41.379093,lon:2.137748},
+  {fid:26,name:"Hospital Clínic",lat:41.381857,lon:2.146083},
+  {fid:27,name:"Verdaguer",lat:41.391974,lon:2.174658},
+  {fid:28,name:"Sagrada Família",lat:41.392934,lon:2.183019},
+  {fid:29,name:"Sant Pau|Dos de Maig",lat:41.392977,lon:2.188999},
+  {fid:30,name:"Camp de l'Arpa",lat:41.393953,lon:2.199752}
+];
+
+// Care home data: [fid,lat,lon,dist,name,district,barri,address,tier]
+var rawHomes = [
+[1,41.4344,2.14642,3256.4,"Residència Assistida per a Gent Gran Hospital de Sant Miquel","Horta-Guinardó","Montbau","Pg Vall d'Hebron 157","Critical"],
+[2,41.40742,2.15339,863.9,"Residència Assistida per a Gent Gran Verdi Residencial","Gràcia","la Vila de Gràcia","Verdi 142","Moderate"],
+[3,41.38111,2.16811,116.4,"Residència Assistida per a Gent Gran Acayser del Carme","Ciutat Vella","el Raval","C Carme 64","Excellent"],
+[4,41.39407,2.17625,267.9,"Residència Assistida per a Gent Gran Olivaret Eixample","Eixample","la Dreta de l'Eixample","Pl Tetuan 2","Excellent"],
+[5,41.39959,2.20113,636.1,"Residència Assistida per a Gent Gran Llacuna","Sant Martí","el Poblenou","Carrer de la Llacuna 30","Good"],
+[6,41.39618,2.18274,361.1,"Residència Assistida per a Gent Gran Fort Pienc","Eixample","el Fort Pienc","C Sardenya 139","Excellent"],
+[7,41.41962,2.17817,1760.3,"Residència Assistida per a Gent Gran Mercat del Guinardó","Horta-Guinardó","el Guinardó","C Oblit 29","Poor"],
+[8,41.40738,2.15655,602.2,"Residència Assistida Virgen de Lourdes I","Gràcia","la Vila de Gràcia","Carrer de Vilafranca 20","Good"],
+[9,41.40027,2.14158,2042.4,"Residència Assistida per a Gent Gran LEixample III","Sarrià-Sant Gervasi","Sant Gervasi - Galvany","C Muntaner 402","Critical"],
+[10,41.40587,2.1192,3353.3,"Residència Assistida per a Gent Gran Sant Gervasi Residencial","Sarrià-Sant Gervasi","Sarrià","C Martorell i Peña 2","Critical"],
+[11,41.40996,2.17307,810.8,"Residència Assistida per a Gent Gran DomusVi Claret","Eixample","la Sagrada Família","C Sant Antoni Maria Claret 200","Moderate"],
+[12,41.40761,2.19205,1644.7,"Residència Assistida per a Gent Gran La Vostra Llar Clot","Sant Martí","el Clot","G.V. Corts Catalanes 871","Poor"],
+[13,41.39324,2.17603,181.5,"Residència Assistida per a Gent Gran Verge del Roser","Eixample","la Dreta de l'Eixample","C Casp 82","Excellent"],
+[14,41.41115,2.15624,708.2,"Residència Assistida per a Gent Gran La Vostra Llar Parc Güell","Gràcia","la Salut","Carrer de la Mare de Déu de la Salut 39","Good"],
+[15,41.37719,2.17287,506.4,"Residència Assistida per a Gent Gran Mil·lenari","Ciutat Vella","el Raval","Carrer Nou de la Rambla 47","Good"],
+[16,41.39407,2.17625,267.9,"Residència Assistida per a Gent Gran Olivaret Eixample","Eixample","la Dreta de l'Eixample","Pl Tetuan 2","Excellent"],
+[17,41.39994,2.13846,2106.3,"Residencial Augusta Park","Sarrià-Sant Gervasi","Sant Gervasi - Galvany","C Copèrnic 30","Critical"],
+[18,41.40145,2.20197,853.0,"Residència Assistida per a Gent Gran Venero","Sant Martí","el Poblenou","C Venero 4","Moderate"],
+[19,41.40558,2.14136,1887.2,"Residència Assistida per a Gent Gran Santa Creu","Sarrià-Sant Gervasi","el Putxet i el Farró","C Elisa 22","Poor"],
+[20,41.42871,2.16375,2287.1,"Residència  Fundació Valldejuli","Horta-Guinardó","Horta","Pg Maragall 378","Critical"],
+[21,41.39298,2.17254,125.0,"Residència Com a Casa","Eixample","la Dreta de l'Eixample","G.V. Corts Catalanes 651","Excellent"],
+[22,41.38913,2.17814,312.7,"Residència Assistida per a Gent Gran de la Fe","Ciutat Vella","Sant Pere, Santa Caterina i la Ribera","C Sant Pere Més Alt 72","Excellent"],
+[23,41.37823,2.15286,111.0,"Centre de Dia","Eixample","la Nova Esquerra de l'Eixample","G.V. Corts Catalanes 429","Excellent"],
+[24,41.41253,2.18218,1622.1,"Residència Assistida per a Gent San Pablo","Sant Martí","el Camp de l'Arpa del Clot","C Coll i Vehí 26","Poor"],
+[25,41.39289,2.17618,163.0,"Llar Residència","Eixample","la Dreta de l'Eixample","C Bailèn 28","Excellent"],
+[26,41.40026,2.14158,2043.1,"Residència Assistida per a Gent Gran Pro Avis en Família","Sarrià-Sant Gervasi","Sant Gervasi - Galvany","C Muntaner 402","Critical"],
+[27,41.3834,2.1598,490.4,"Residència Assistida per a Gent Gran Llar Malpa","Eixample","l'Antiga Esquerra de l'Eixample","G.V. Corts Catalanes 541","Good"],
+[28,41.42852,2.15936,2295.2,"Residència Assistida per a Gent Gran Desalup-Horta","Horta-Guinardó","Horta","Bda Plana 7","Critical"],
+[29,41.38265,2.13328,543.4,"Residència Assistida Sanitas Les Corts","Les Corts","les Corts","C Evarist Arnús 22","Good"],
+[30,41.42401,2.16295,1766.5,"Residència Assistida per a Gent Gran Bonavita","Horta-Guinardó","la Font d'en Fargues","C Pedrell 111","Poor"],
+[31,41.4204,2.20121,2938.8,"Residència Assistida per a Gent Gran La Verneda","Sant Martí","la Verneda i la Pau","Cantàbria 28","Critical"],
+[32,41.38286,2.16869,92.9,"Residència Assistida per a Gent Gran Santa Rita","Ciutat Vella","el Raval","C Doctor Dou 12","Excellent"],
+[33,41.39424,2.14605,1374.2,"Residència Assistida per a Gent Gran Llar Amigó","Sarrià-Sant Gervasi","Sant Gervasi - Galvany","C Amigó 2","Poor"],
+[34,41.40302,2.17039,256.7,"Residència Assistida per a Gent Gran Sagrada Família 1","Eixample","la Sagrada Família","C Rosselló 344","Excellent"],
+[35,41.39708,2.16254,608.0,"Residència Assistida per a Gent Gran Casa Nostra","Eixample","la Dreta de l'Eixample","Av Diagonal 369","Good"],
+[36,41.38013,2.15546,222.3,"Residència Assistida per a Gent Gran Francesc Layret","Eixample","la Nova Esquerra de l'Eixample","G.V. Corts Catalanes 475","Excellent"],
+[37,41.43064,2.1446,2966.6,"Residència Assistida per a Gent Gran Llar Sant Jordi","Horta-Guinardó","Montbau","Pg Vall d'Hebron 135","Critical"],
+[38,41.3989,2.16333,541.9,"Residència Assistida per a Gent Gran Bruc","Eixample","la Dreta de l'Eixample","C Bruc 151","Good"],
+[39,41.42557,2.13669,2974.8,"Residència Assistida per a Gent Gran Mas Piteu","Horta-Guinardó","Sant Genís dels Agudells","C Natzaret 67","Critical"],
+[40,41.39411,2.16046,860.1,"Residència Assistida per a Gent Gran LEixample II","Eixample","la Dreta de l'Eixample","C Provença 245","Moderate"],
+[41,41.38914,2.17247,364.1,"Residència Assistida per a Gent Gran Urquinaona II","Eixample","la Dreta de l'Eixample","Pl Urquinaona 1","Excellent"],
+[42,41.3827,2.15981,417.4,"Residència Assistida per a Gent Gran Sidibel","Eixample","Sant Antoni","G.V. Corts Catalanes 540","Good"],
+[43,41.40206,2.16278,388.3,"Residència Assistida Virgen de Lourdes II","Gràcia","la Vila de Gràcia","Carrer de Quevedo 1","Excellent"],
+[44,41.40641,2.17868,1031.5,"Residència Assistida Sanitas Sagrada Família","Eixample","la Sagrada Família","C Castillejos 256","Moderate"],
+[45,41.42842,2.16583,2262.7,"Residència Assistida per a Gent Gran Coloma","Nou Barris","Vilapicina i la Torre Llobeta","C Pitàgores 14","Critical"],
+[46,41.41381,2.1568,855.2,"Residència Assistida per a Gent Gran DomusVi La Salut","Gràcia","la Salut","C Antequera 8","Moderate"],
+[47,41.38913,2.17814,312.7,"Residència Assistida per a Gent Gran de la Fe","Ciutat Vella","Sant Pere, Santa Caterina i la Ribera","C Sant Pere Més Alt 72","Excellent"],
+[48,41.37037,2.14027,705.9,"Residència Assistida per a Gent Gran Mossèn Vidal i Aunós","Sants-Montjuïc","la Bordeta","C Navarra 12","Good"],
+[49,41.37317,2.17147,364.2,"Residència Assistida per a Gent Gran Pare Batllori","Sants-Montjuïc","el Poble-sec","C Vila i Vilà 39","Excellent"],
+[50,41.42627,2.19183,3098.0,"Residència Assistida per a Gent Gran La Sagrera","Sant Andreu","la Sagrera","C Berenguer de Palou 102","Critical"],
+[51,41.38801,2.13917,894.5,"Residència Assistida per a Gent Gran Les Corts","Les Corts","les Corts","C Montnegre 33","Moderate"],
+[52,41.40727,2.15332,871.3,"Residència Assistida per a Gent Gran Verdi","Gràcia","la Vila de Gràcia","C Verdi 151","Moderate"],
+[53,41.37429,2.13655,262.6,"Residència Assistida per a Gent Gran Josep Miracle","Sants-Montjuïc","Sants","Pl Bonet i Muixí 1","Excellent"],
+[54,41.43478,2.15682,3016.6,"Residència Assistida per a Gent Gran","Horta-Guinardó","Horta","C Salses 74","Critical"],
+[55,41.4013,2.15976,653.8,"Residència Assistida per a Gent Gran Salus Gràcia","Gràcia","la Vila de Gràcia","C Mare Déu dels Desemparats 2","Good"],
+[56,41.37857,2.15337,167.0,"Residència Assistida San Patricio","Eixample","la Nova Esquerra de l'Eixample","G.V. Corts Catalanes 439","Excellent"],
+[57,41.43491,2.1549,3064.7,"Residència Assistida per a Gent Gran Bon Viure","Horta-Guinardó","Horta","Campoamor 56","Critical"],
+[58,41.39628,2.17059,135.1,"Residència Assistida per a Gent Gran Ramon Sala","Eixample","la Dreta de l'Eixample","C Aragó 344","Excellent"],
+[59,41.39584,2.18773,334.7,"Residència Assistida per a Gent Gran La Trobada","Sant Martí","el Parc i la Llacuna del Poblenou","C Joan d'Austria 105","Excellent"],
+[60,41.39216,2.11057,2350.5,"Residència Assistida per a Gent Gran Maria Reina","Les Corts","Pedralbes","Moneders 12","Critical"],
+[61,41.37448,2.12817,261.4,"Residència Assistida per a Gent Gran Racó de Pau","Sants-Montjuïc","Sants - Badal","C Sugranyes 31","Excellent"],
+[62,41.39977,2.1706,277.9,"Residència Assistida per a Gent Gran Sènior Centre","Eixample","la Dreta de l'Eixample","C Mallorca 340","Excellent"],
+[63,41.40309,2.19934,1015.3,"Residència Assistida per a Gent Gran Antic de València","Sant Martí","el Poblenou","Camí Antic de València 5","Moderate"],
+[64,41.40604,2.13769,2184.9,"Residència Assistida per a Gent Gran Sant Gervasi Parc","Sarrià-Sant Gervasi","Sant Gervasi - la Bonanova","C Teodora Lamadrid 7","Critical"],
+[65,41.38121,2.13455,355.7,"Residència Assistida per a Gent Gran Centre Parc","Sants-Montjuïc","Sants","Av Madrid 210","Excellent"],
+[66,41.41133,2.16745,476.4,"Residència Assistida per a Gent Gran Lepant Residencial","Horta-Guinardó","el Baix Guinardó","C Lepant 401","Good"],
+[67,41.4014,2.16017,617.6,"Residència Assistida per a Gent Gran Gràcia","Gràcia","la Vila de Gràcia","C Siracusa 23","Good"],
+[68,41.4351,2.14688,3309.4,"Centre Residencial Mutuam Collserola","Horta-Guinardó","Montbau","Pg Vall d'Hebron 159","Critical"],
+[69,41.42367,2.20473,3325.2,"Residència Assistida per a Gent Gran Kristel Oro","Sant Martí","la Verneda i la Pau","Ptge Arriassa 2","Critical"],
+[70,41.40909,2.14965,1178.6,"Residència Assistida per a Gent Gran DomusVi Regina","Gràcia","la Salut","C Mare de Déu del Coll 22","Moderate"],
+[71,41.42926,2.13411,3409.1,"Residència Assistida per a Gent Gran Valle Hebrón","Horta-Guinardó","Sant Genís dels Agudells","C Olvan 5","Critical"],
+[72,41.36786,2.14171,955.8,"Residència Assistida per a Gent Gran Barcelona - Font Florida","Sants-Montjuïc","la Font de la Guatlla","Carrer de la Font Florida 98","Moderate"],
+[73,41.41644,2.1815,1752.7,"Residència per a Gent Gran Alchemika","Sant Martí","el Camp de l'Arpa del Clot","Carrer de Sant Antoni Maria Claret 360","Poor"],
+[74,41.41279,2.13141,2747.7,"Residència Assistida Sanitas Altanova - Sant Gervasi","Sarrià-Sant Gervasi","Sant Gervasi - la Bonanova","C Quatre Camins 95","Critical"],
+[75,41.38477,2.172,106.4,"Residència Assistida per a Gent Gran La Mercè","Ciutat Vella","el Barri Gòtic","C Canuda 17","Excellent"],
+[76,41.43249,2.17621,2902.2,"Residència Assistida per a Gent Gran Porta","Nou Barris","Porta","C Maladeta 30","Critical"],
+[77,41.42815,2.15996,2247.1,"Residència Assistida per a Gent Gran Raset","Horta-Guinardó","Horta","Ptge Capdevila 8","Critical"],
+[78,41.42271,2.17784,2006.7,"Residència Assistida per a Gent Gran Baró","Horta-Guinardó","el Guinardó","Carrer del Segle XX 16","Critical"],
+[79,41.409,2.12612,3141.7,"Residència Assistencial per a Gent Gran Bellesguard Park","Sarrià-Sant Gervasi","Sant Gervasi - la Bonanova","C Valeta d'Arquer 30","Critical"],
+[80,41.42132,2.17032,1567.9,"Residència Assistida per a Gent Gran Parc del Guinardó","Horta-Guinardó","el Guinardó","Garriga i Roca 62","Poor"],
+[81,41.41194,2.18593,1859.7,"Residència Assistida per a Gent Gran Marvi Park","Sant Martí","el Camp de l'Arpa del Clot","C Mallorca 607","Poor"],
+[82,41.39192,2.16842,243.3,"Residència Assistida per a Gent Gran lArboc","Eixample","la Dreta de l'Eixample","Pau Claris 112","Excellent"],
+[83,41.4113,2.1322,2655.3,"Residència Assistida per a Gent Gran El Meu Jardí","Sarrià-Sant Gervasi","Sant Gervasi - la Bonanova","C Quatre Camins 74","Critical"],
+[84,41.41005,2.1648,234.5,"Residència Assistida per a Gent Gran Los Tilos","Horta-Guinardó","el Baix Guinardó","C Sardenya 480","Excellent"],
+[85,41.40646,2.16728,351.5,"Residència Assistida per a Gent Gran Arcoiris I","Gràcia","el Camp d'en Grassot i Gràcia Nova","C Sicília 402","Excellent"],
+[86,41.3817,2.1875,461.6,"Residència Assistida per a Gent Gran Barceloneta - Bertran Oriola","Ciutat Vella","la Barceloneta","C Carbonell 4","Good"],
+[87,41.43268,2.15828,2764.8,"Residència Assistida Campoamor","Horta-Guinardó","Horta","C Campoamor 1","Critical"],
+[88,41.40728,2.17837,1050.9,"Residència Assistida Sanitas Provença","Eixample","la Sagrada Família","C Provença 514","Moderate"],
+[89,41.39005,2.17713,297.0,"Associació Prudenci Miralles per a Ancians","Eixample","la Dreta de l'Eixample","C Trafalgar 39","Excellent"],
+[90,41.42248,2.14839,2044.7,"Centre Residencial Santa Rosalia","Horta-Guinardó","la Teixonera","C Santa Rosalia 79","Critical"],
+[91,41.42354,2.17102,1819.7,"Residència Assistida Sanitas Bonaire - Guinardó","Horta-Guinardó","la Font d'en Fargues","C Alt de Pedrell 100","Poor"],
+[92,41.3991,2.16874,214.4,"Residència Assistida per a Gent Gran Verdaguer","Eixample","la Dreta de l'Eixample","Av Diagonal 382","Excellent"],
+[93,41.4067,2.15279,924.1,"Llar Residència Hermanitas dels Pobres Sant Salvador","Gràcia","la Vila de Gràcia","C Sant Salvador 1","Moderate"],
+[94,41.39795,2.20524,638.0,"Residència Assistida per a Gent Gran Icària Residencial","Sant Martí","el Poblenou","Rbla Poblenou 5","Good"],
+[95,41.39807,2.16652,286.2,"Residència Assistida per a Gent Torres Diagonal","Eixample","la Dreta de l'Eixample","Av Diagonal 343","Excellent"],
+[96,41.37731,2.15294,69.2,"Residència Assistida per a Gent Gran Nova Alegria","Eixample","Sant Antoni","G.V. Corts Catalanes 420","Excellent"],
+[97,41.40478,2.12256,3121.2,"Centre Residencial Mas d'Angli","Sarrià-Sant Gervasi","Sarrià","C Institut Químic de Sarrià 43","Critical"],
+[98,41.41042,2.16006,396.7,"Residència Assistida per a Gent Gran Adegius","Gràcia","el Camp d'en Grassot i Gràcia Nova","C Ca l'Alegre de Dalt 72","Excellent"],
+[99,41.39993,2.1699,287.7,"Residència Assistida per a Gent Gran Diagonal I","Eixample","la Dreta de l'Eixample","Pg Sant Joan 104","Excellent"],
+[100,41.42742,2.16942,2197.1,"Residència Assistida per a Gent Gran Star","Nou Barris","Vilapicina i la Torre Llobeta","Pg Maragall 306","Critical"],
+[101,41.43109,2.16093,2561.5,"Residència Assistida per a Gent Gran El Vent","Horta-Guinardó","Horta","C Vent 4","Critical"],
+[102,41.40382,2.11417,3379.2,"Residència Assistida per a Gent Gran Institut Desert de Sarrià","Sarrià-Sant Gervasi","Sarrià","Pg Santa Eulàlia 23","Critical"],
+[103,41.372,2.14136,505.8,"Residència Assistida per a Gent Gran Passeig de Gràcia","Sants-Montjuïc","la Bordeta","C Gavà 11","Good"],
+[104,41.41791,2.15104,1516.8,"Residència Assistida per a Gent Gran Vibentia Mullerat","Horta-Guinardó","el Carmel","C Portell 11","Poor"],
+[105,41.40542,2.20542,1358.5,"Residència Assistida per a Gent Gran Acolliment a la Vellesa I","Sant Martí","el Poblenou","Carrer de Pujades 273","Poor"],
+[106,41.40423,2.1955,1195.3,"Residència Assistida per a Gent Gran Amavir Diagonal","Sant Martí","el Poblenou","C Llacuna 120","Moderate"],
+[107,41.41499,2.10824,4687.3,"Residència Assistida per a Gent Gran Edelweiss Vallvidrera","Sarrià-Sant Gervasi","Vallvidrera, el Tibidabo i les Planes","C Algarves 23","Critical"],
+[108,41.40656,2.14653,1444.0,"Residència Assistida per a Gent Gran La Torreta","Sarrià-Sant Gervasi","el Putxet i el Farró","C Homer 27","Poor"],
+[109,41.39274,2.18434,112.4,"Residència Assistida per a Gent Gran Ballesol Almogàvers","Sant Martí","el Parc i la Llacuna del Poblenou","C Almogàvers 32","Excellent"],
+[110,41.39114,2.17398,108.6,"Residència Assistida per a Gent Gran El Mussol","Eixample","la Dreta de l'Eixample","C Bruc 32","Excellent"],
+[111,41.42977,2.14254,2984.5,"Residència Assistida per a Gent Gran Bacumar","Horta-Guinardó","Montbau","C Domènech i Montaner 2","Critical"],
+[112,41.42571,2.1678,1984.0,"Residència Assistida per a Gent Gran El Mirador de Font den Fargues","Horta-Guinardó","la Font d'en Fargues","C Gallecs 14","Poor"],
+[113,41.39364,2.17256,153.1,"Residència Assistida per a Gent Gran Llar Girona","Eixample","la Dreta de l'Eixample","C Girona 51","Excellent"],
+[114,41.37823,2.15286,111.0,"Centre de Dia","Eixample","la Nova Esquerra de l'Eixample","G.V. Corts Catalanes 429","Excellent"],
+[115,41.4074,2.15657,600.3,"Residència Assistida per a Gent Gran Verge de Lourdes I","Gràcia","la Vila de Gràcia","Vilafranca 22","Good"],
+[116,41.4344,2.14642,3256.4,"Residència Assistida per a Gent Gran Hospital de Sant Miquel","Horta-Guinardó","Montbau","Pg Vall d'Hebron 157","Critical"],
+[117,41.40659,2.17308,643.4,"Residència Assistida per a Gent Gran Terra Ferma","Eixample","la Sagrada Família","C Còrsega 540","Good"],
+[118,41.4289,2.1594,2335.5,"Residència Assistida per a Gent Gran Santa Rita Horta","Horta-Guinardó","Horta","Bda Plana 16","Critical"],
+[119,41.39704,2.16055,774.5,"Residència Assistida per a Gent Gran Marla Diagonal","Eixample","la Dreta de l'Eixample","Av Diagonal 442","Good"],
+[120,41.39993,2.1699,287.7,"Residència Assistida per a Gent Gran Diagonal I","Eixample","la Dreta de l'Eixample","Pg Sant Joan 104","Excellent"],
+[121,41.43576,2.14716,3365.9,"Residència Assistida per a Gent Gran Llars Mundet","Horta-Guinardó","Montbau","Pg Vall d'Hebron 171","Critical"],
+[122,41.43002,2.17145,2517.7,"Residència Assistida Idea Vilapicina","Nou Barris","Vilapicina i la Torre Llobeta","C Vilapicina 21","Critical"],
+[123,41.44471,2.18121,4319.6,"Residència Assistida per a Gent Gran Molí - Via Favencia","Nou Barris","la Prosperitat","C Molí 57","Critical"],
+[124,41.39411,2.16046,860.1,"Residència Assistida per a Gent Gran LEixample II","Eixample","la Dreta de l'Eixample","C Provença 245","Moderate"],
+[125,41.40768,2.14617,1465.0,"Residència Assistida per a Gent Gran San Miguel Arcàngel","Sarrià-Sant Gervasi","el Putxet i el Farró","C Escipió 17","Poor"],
+[126,41.42022,2.17506,1646.5,"Residència Assistida per a Gent Gran Caliu","Horta-Guinardó","el Guinardó","C Vinyals 34","Poor"],
+[127,41.40497,2.15364,908.9,"Residència Assistida per a Gent Gran Meràn Lesseps","Gràcia","la Vila de Gràcia","Santa Àgata 41","Moderate"],
+[128,41.44811,2.18481,4778.7,"Residència Assistida per a Gent Gran La Trinitat Nova","Nou Barris","la Trinitat Nova","C Fosca 4","Critical"],
+[129,41.42102,2.1188,4016.1,"Residència Assistida per a Gent Gran Vil·la Magda","Sarrià-Sant Gervasi","Vallvidrera, el Tibidabo i les Planes","C Colònia del Tibidabo 3","Critical"],
+[130,41.41687,2.16606,993.1,"Residència Assistencial per Gent Gran Sol de Tardor","Horta-Guinardó","Can Baró","C Francesc Alegre 24","Moderate"],
+[131,41.42179,2.16013,1547.3,"Residència Assisitida per a Gent Gran Los Olivos","Horta-Guinardó","el Carmel","C Montserrat de Casanovas 201","Poor"],
+[132,41.38589,2.16655,366.5,"Residència Geros 4","Eixample","la Dreta de l'Eixample","C Pelai 9","Excellent"],
+[133,41.40463,2.17255,483.8,"Residència Assistida ORS","Eixample","la Sagrada Família","C Rosselló 380","Good"],
+[134,41.43897,2.20244,4714.8,"Residència Assistida per a Gent Gran Bon Pastor","Sant Andreu","el Bon Pastor","C Augusto César Sandino 7","Critical"],
+[135,41.42306,2.17586,1946.9,"Residència Assistida per a Gent Gran Moll de la Fusta","Horta-Guinardó","el Guinardó","Carrer de Varsòvia 36","Poor"],
+[136,41.39722,2.16525,380.9,"Residència Assistida Hermanas del Sagrado Corazón","Eixample","la Dreta de l'Eixample","C Bruc 131","Excellent"],
+[137,41.4083,2.14821,1293.6,"Residència Assistencial per a Gent Gran Refugi d'Obreres","Gràcia","Vallcarca i els Penitents","Av República Argentina 16","Poor"],
+[138,41.40349,2.11723,3206.2,"Residència Assistida San Ignacio de Loyola","Sarrià-Sant Gervasi","Sarrià","Major de Sarrià 238","Critical"],
+[139,41.39381,2.17496,205.6,"Residència Assistida per Gent Gran Canava 2002","Eixample","la Dreta de l'Eixample","C Bailèn 46","Excellent"],
+[140,41.39393,2.16474,541.7,"Residència Assistida per a Gent Gran Ricard Julià","Eixample","la Dreta de l'Eixample","C València 263","Good"],
+[141,41.43915,2.165,3448.5,"Residència Assistida per a Gent Gran Parc Central","Nou Barris","la Guineueta","Passeig de Valldaura 142","Critical"],
+[142,41.41451,2.14426,1772.5,"Residència Assistida per a Gent Gran Els Jardins de Barcelona","Gràcia","Vallcarca i els Penitents","C Baró de la Barre 5","Poor"],
+[143,41.3769,2.15115,97.8,"Residència Bon Eixample","Eixample","la Nova Esquerra de l'Eixample","G.V. Corts Catalanes 399","Excellent"],
+[144,41.40551,2.15882,498.4,"Residència Villa Mena","Gràcia","la Vila de Gràcia","C Montmany 70","Good"],
+[145,41.39485,2.17671,362.5,"Residència Assistida per a Gent Gran Hermanitas dels Pobres Tetuan","Eixample","el Fort Pienc","Pl Tetuan 45","Excellent"],
+[146,41.4351,2.14688,3309.4,"Centre Residencial Mutuam Collserola","Horta-Guinardó","Montbau","Pg Vall d'Hebron 159","Critical"],
+[147,41.39936,2.11477,2940.5,"Residència Assistida per a Gent Gran Pedralbes Park Residencial","Sarrià-Sant Gervasi","Sarrià","C Pere II de Montcada 20","Critical"],
+[148,41.43014,2.18012,2804.9,"Residència Assistida per a Gent Gran Ballesol Fabra i Puig","Nou Barris","Vilapicina i la Torre Llobeta","Pg Fabra i Puig 139","Critical"],
+[149,41.40302,2.17039,256.7,"Residència Assistida per a Gent Gran Sagrada Família 1","Eixample","la Sagrada Família","C Rosselló 344","Excellent"],
+[150,41.42255,2.13932,2591.4,"Residència Assistida per a Gent Gran Centre Gerontològic Azurimar","Horta-Guinardó","Sant Genís dels Agudells","C Natzaret 16","Critical"],
+[151,41.38784,2.16658,527.4,"Residència Assistida per a Gent Gran El Jardí 2000","Eixample","la Dreta de l'Eixample","G.V. Corts Catalanes 618","Good"],
+[152,41.41521,2.16559,804.6,"Residència Assistida per a Gent Gran Sharedx Care","Horta-Guinardó","Can Baró","C Polònia 37","Moderate"],
+[153,41.42389,2.17644,2050.2,"Residència Assistida per a Gent Gran La Vostra Llar Les Dàlies","Horta-Guinardó","el Guinardó","C Varsòvia 16","Critical"],
+[154,41.39196,2.17289,147.7,"Residència Assistida Maria Rifa","Eixample","la Dreta de l'Eixample","C Bruc 46","Excellent"],
+[155,41.39126,2.19738,300.9,"Residència Llar Vila Olímpica","Sant Martí","la Vila Olímpica del Poblenou","Av Icària 160","Excellent"],
+[156,41.38749,2.15126,760.6,"Residència Assistida Marín","Eixample","la Nova Esquerra de l'Eixample","C Comte d'Urgell 155","Good"],
+[157,41.39446,2.17373,286.3,"Residència Assistida per a Gent Gran Seribel","Eixample","la Dreta de l'Eixample","C Bailèn 51","Excellent"],
+[158,41.3854,2.15605,700.1,"Residència Assistida per a Gent Gran LEstel III","Eixample","l'Antiga Esquerra de l'Eixample","C Aragó 140","Good"],
+[159,41.38673,2.15915,838.5,"Residència Assistida Virgen de las Nieves","Eixample","l'Antiga Esquerra de l'Eixample","C Muntaner 63","Moderate"],
+[160,41.38918,2.16332,764.3,"Residència Assistida per a Gent Gran Consejo de Ciento","Eixample","la Dreta de l'Eixample","C Consell de Cent 276","Good"],
+[161,41.38518,2.15801,659.2,"Residència Assistida Sanitas Consell de Cent","Eixample","l'Antiga Esquerra de l'Eixample","C Consell de Cent 210","Good"],
+[162,41.37565,2.15124,207.4,"Residència Assistida per a Gent Gran Llevant","Eixample","Sant Antoni","C Llançà 7","Excellent"],
+[163,41.4102,2.15719,590.7,"Residència Assistida Francisco Darder","Gràcia","la Salut","C Cardener 49","Good"],
+[164,41.4102,2.18622,1782.4,"Residència Assistida per a Gent Gran Sibelius","Sant Martí","el Camp de l'Arpa del Clot","Sibelius 1","Poor"],
+[165,41.40646,2.16728,351.5,"Residència Assistida per a Gent Gran Arcoiris I","Gràcia","el Camp d'en Grassot i Gràcia Nova","C Sicília 402","Excellent"],
+[166,41.39785,2.16699,241.7,"Residència Assistida per Gent Gran Claror","Eixample","la Dreta de l'Eixample","C Girona 131","Excellent"],
+[167,41.39712,2.17806,622.9,"Residència Assistida per a Gent Gran Royal Llar","Eixample","el Fort Pienc","G.V. Corts Catalanes 695","Good"],
+[168,41.38914,2.17247,364.1,"Residència Assistida per a Gent Gran Urquinaona II","Eixample","la Dreta de l'Eixample","Pl Urquinaona 1","Excellent"],
+[169,41.37797,2.17842,357.2,"Residència Assistida per a Gent Gran Collserola","Ciutat Vella","el Barri Gòtic","C Josep Anselm Clavé 6","Excellent"],
+[170,41.40259,2.12717,2755.0,"Residència Assistida per a Gent Gran DomusVi Bonanova","Sarrià-Sant Gervasi","les Tres Torres","C Calatrava 83","Critical"],
+[171,41.46274,2.18386,6295.4,"Residència Assistida per a Gent Gran Vallbona","Nou Barris","Vallbona","C Pierola 22","Critical"],
+[172,41.43522,2.14882,3256.0,"Residència Assistida per a Gent Gran Amavir Horta","Horta-Guinardó","la Vall d'Hebron","Av Can Marcet 11","Critical"],
+[173,41.39916,2.20593,774.9,"Residència Assistida per a Gent Gran Jaume Batlle","Sant Martí","el Poblenou","C Fernando Poo 45","Good"],
+[174,41.38957,2.17477,266.7,"Residència Assistida per a Gent Gran Vivaldi","Eixample","la Dreta de l'Eixample","Rda Sant Pere 32","Excellent"],
+[175,41.40448,2.15171,1079.5,"Residència Assistida per a Gent Gran La Vostra Llar Gràcia","Gràcia","la Vila de Gràcia","C Gran de Gràcia 226","Moderate"],
+[176,41.39209,2.16908,185.7,"Residència Assistida Els Ametllers","Eixample","la Dreta de l'Eixample","C Diputació 293","Excellent"],
+[177,41.39932,2.12044,2671.8,"Residència Assistida per a Gent Gran Casa de Família","Sarrià-Sant Gervasi","Sarrià","Pg Reina Elisenda Montcada 7","Critical"],
+[178,41.40685,2.21005,1670.6,"Residència Assistida per a Gent Gran Poblenou","Sant Martí","Diagonal Mar i el Front Marítim del Poblenou","C Llull 328","Poor"],
+[179,41.37478,2.16937,139.9,"Centre Residencial Colisee","Sants-Montjuïc","el Poble-sec","Avinguda del Paral·lel 63","Excellent"],
+[180,41.40666,2.17835,1018.3,"Residència Assistida Las Acacias","Eixample","la Sagrada Família","C Castillejos 260","Moderate"],
+[181,41.41493,2.18571,1990.2,"Residència Assistida per a Gent Gran Sant Olga","Sant Martí","el Camp de l'Arpa del Clot","C Ripollès 75","Poor"],
+[182,41.40291,2.12536,2839.5,"Residència Assistida per a Gent Gran Armonia","Sarrià-Sant Gervasi","Sant Gervasi - la Bonanova","C Pomaret 6","Critical"],
+[183,41.38511,2.16208,658.7,"Residència Assistida per a Gent Gran Las Violetas","Eixample","l'Antiga Esquerra de l'Eixample","G.V. Corts Catalanes 573","Good"],
+[184,41.40026,2.14121,2070.6,"Residència Assistida per a Gent Gran Llar de l'Avi","Sarrià-Sant Gervasi","Sant Gervasi - Galvany","C Muntaner 411","Critical"],
+[185,41.40808,2.14086,1907.6,"Centre Residencial Putxet","Sarrià-Sant Gervasi","el Putxet i el Farró","Carrer de Roca i Batlle 31","Poor"],
+[186,41.41849,2.14398,2010.7,"Residència Assistida per a Gent Gran Hogar La Salud","Gràcia","Vallcarca i els Penitents","C Cardedeu 47","Critical"],
+[187,41.40236,2.16615,107.7,"Residència Assistida per a Gent Gran Bon Repòs","Gràcia","el Camp d'en Grassot i Gràcia Nova","Pg Sant Joan 156","Excellent"],
+[188,41.3798,2.17779,566.2,"Residència Assistida per a Gent Gran La Mercè","Ciutat Vella","el Barri Gòtic","C Rull 1","Good"],
+[189,41.41704,2.16585,1007.6,"Residència Assistida Vil·la Salut","Horta-Guinardó","Can Baró","Francesc Alegre 26","Moderate"],
+[190,41.39358,2.15107,1366.9,"Residència Assistida per a Gent Gran Sant Daniel I","Eixample","l'Antiga Esquerra de l'Eixample","C Londres 94","Poor"],
+[191,41.42235,2.18335,2280.8,"Residència Assistida per a Gent Gran Centre gerontològic Anna","Sant Andreu","el Congrés i els Indians","C Pinar del Río 10","Critical"],
+[192,41.39289,2.17618,163.0,"Llar Residència","Eixample","la Dreta de l'Eixample","C Bailèn 28","Excellent"],
+[193,41.36899,2.14324,826.2,"Residència Assistida per a Gent Gran Gran Via Parc","Sants-Montjuïc","la Font de la Guatlla","C Mandoni 11","Moderate"],
+[194,41.42548,2.15012,2237.0,"Residència Assistida per a Gent Gran d'Horta","Horta-Guinardó","la Teixonera","C Josep Sangenís 75","Critical"],
+[195,41.4268,2.17089,2160.5,"Residència Assistida per a Gent Gran Maragall","Horta-Guinardó","la Font d'en Fargues","Passeig de Maragall 295","Critical"],
+[196,41.4345,2.15551,3009.1,"Residència Assisitida per a Gent Gran La Teva Residència","Horta-Guinardó","Horta","Carrer de Campoamor 48","Critical"],
+[197,41.40025,2.18312,812.8,"Residència Assistida Gent Gran","Eixample","el Fort Pienc","G.V. Corts Catalanes 800","Moderate"],
+[198,41.38896,2.16139,916.4,"Residència Assistida per a Gent Gran La Pau","Eixample","l'Antiga Esquerra de l'Eixample","Pl Doctor Letamendi 35","Moderate"],
+[199,41.40711,2.11436,3674.3,"Residència Assistida per a Gent Gran Betània","Sarrià-Sant Gervasi","Sarrià","Av Vallvidrera 34","Critical"],
+[200,41.43311,2.16271,2776.7,"Residència Assistida Masdeu Hogar","Horta-Guinardó","Horta","Mestre Dalmau 3","Critical"],
+[201,41.42468,2.16631,1852.7,"Residència Assistida per a Gent Gran Pedrell","Horta-Guinardó","la Font d'en Fargues","C Pedrell 52","Poor"],
+[202,41.39358,2.15107,1366.9,"Residència Assistida per a Gent Gran Sant Daniel I","Eixample","l'Antiga Esquerra de l'Eixample","C Londres 94","Poor"],
+[203,41.39135,2.16404,609.7,"Residència Assistida per a Gent Gran Anna","Eixample","la Dreta de l'Eixample","C Aragó 268","Good"],
+[204,41.39403,2.16707,358.6,"Residència Assistida per a Gent Gran Aragó","Eixample","la Dreta de l'Eixample","C Aragó 293","Excellent"],
+[205,41.4343,2.16333,2907.7,"Residència Assistida Barcelona","Horta-Guinardó","Horta","Pg Fabra i Puig 395","Critical"],
+[206,41.39324,2.17603,181.5,"Residència Assistida per a Gent Gran Verge del Roser","Eixample","la Dreta de l'Eixample","C Casp 82","Excellent"],
+[207,41.3991,2.16874,214.4,"Residència Assistida per a Gent Gran Verdaguer","Eixample","la Dreta de l'Eixample","Av Diagonal 382","Excellent"],
+[208,41.41254,2.14004,2036.8,"Residència Assistida per a Gent Gran Jubany","Gràcia","Vallcarca i els Penitents","Av República Argentina 236","Critical"],
+[209,41.41727,2.13806,2370.8,"Residència Assistida per a Gent Gran Solarium","Gràcia","Vallcarca i els Penitents","Carrer de Tità 21","Critical"],
+[210,41.42967,2.15018,2647.0,"Residència Assistida per a Gent Gran Ronda de Dalt Residencial","Horta-Guinardó","la Vall d'Hebron","Carrer del Pare Mariana 15","Critical"],
+[211,41.37823,2.15286,111.0,"Centre de Dia","Eixample","la Nova Esquerra de l'Eixample","G.V. Corts Catalanes 429","Excellent"],
+[212,41.37823,2.15286,111.0,"Centre de Dia","Eixample","la Nova Esquerra de l'Eixample","G.V. Corts Catalanes 429","Excellent"],
+[213,41.43869,2.18611,3878.2,"Residència Assistida per a Gent Gran Casa d'Asil de Sant Andreu","Sant Andreu","Sant Andreu","C Agustí i Milà 72","Critical"],
+[214,41.42415,2.18277,2390.9,"Residència Assistida per a Gent Gran Mare de Déu de Montserrat","Sant Andreu","el Congrés i els Indians","C Cienfuegos 27","Critical"],
+[215,41.40538,2.15191,1029.7,"Residència Assistida per a Gent Gran Lesseps","Gràcia","la Vila de Gràcia","C Maurici Serrahima 12","Moderate"],
+[216,41.41852,2.18964,2457.9,"Residencia Assistencial per a Gent Gran Margal","Sant Andreu","la Sagrera","Carrer de Felip II 36","Critical"],
+[217,41.43885,2.18299,3774.9,"Residència Assistida per a Gent Gran Nin","Nou Barris","Porta","Passeig d'Andreu Nin 69","Critical"],
+[218,41.38853,2.15533,1052.5,"Hotel Residència Ficus","Eixample","l'Antiga Esquerra de l'Eixample","Carrer de Mallorca 163","Moderate"],
+[219,41.43896,2.16047,3436.0,"Residència Assistida per a Gent Gran l'Estel d'Horta","Horta-Guinardó","Horta","Pg Valldaura 92","Critical"],
+[220,41.39412,2.13082,1765.9,"Residència Assistida per a Gent Gran la Nativitat","Sarrià-Sant Gervasi","les Tres Torres","C Buïgas 23","Poor"],
+[221,41.41206,2.16731,533.6,"Residència Assistida per a Gent Gran Orpea","Horta-Guinardó","el Baix Guinardó","Ronda del Guinardó 48","Good"],
+[222,41.37823,2.15286,111.0,"Centre de Dia","Eixample","la Nova Esquerra de l'Eixample","G.V. Corts Catalanes 429","Excellent"],
+[223,41.36884,2.14338,843.5,"Residència Assistida Vitalia Sants","Sants-Montjuïc","la Font de la Guatlla","Carrer de Mandoni 17","Moderate"],
+[224,41.43527,2.1574,3061.1,"Residència Assisitida per a Gent Gran Centre Residencial Dovela","Horta-Guinardó","Horta","Carrer d'Eduard Toda 41","Critical"],
+[225,41.43788,2.16199,3308.0,"Residència Sociosanitaria Psicoclinica Mare de Déu de la Mercè","Horta-Guinardó","Horta","Pg Universal 34","Critical"],
+[226,41.43788,2.16199,3308.0,"Residència Sociosanitaria Psicoclinica Mare de Déu de la Mercè","Horta-Guinardó","Horta","Pg Universal 34","Critical"],
+[227,41.40528,2.12869,2941.9,"Residència Assistida per a Gent Gran Casa meva","Sarrià-Sant Gervasi","Sant Gervasi - la Bonanova","C Vilana 10","Critical"],
+[228,41.40278,2.12882,2733.4,"Residència Assistida Dolça Llar","Sarrià-Sant Gervasi","les Tres Torres","C Escoles Pies 100","Critical"],
+[229,41.44576,2.18504,4545.5,"Residència Assistida per a Gent Palamós","Nou Barris","la Prosperitat","Carrer del Vesuvi 24","Critical"],
+[230,41.36038,2.13801,1687.9,"Residència Assitida per a Gent Gran La Vostra Llar","Sants-Montjuïc","la Marina de Port","Carrer de la Foneria 29","Poor"]
+];
+
+// ── Tier config ──────────────────────────────────────────────────
+var TIER = {
+  Excellent: {col:'#4ade80',glow:'rgba(74,222,128,.45)',sz:7,cls:'b-excellent'},
+  Good:      {col:'#3b82f6',glow:'rgba(59,130,246,.4)',sz:8,cls:'b-good'},
+  Moderate:  {col:'#fbbf24',glow:'rgba(251,191,36,.4)',sz:9,cls:'b-moderate'},
+  Poor:      {col:'#f97316',glow:'rgba(249,115,22,.4)',sz:10,cls:'b-poor'},
+  Critical:  {col:'#ef4444',glow:'rgba(239,68,68,.5)',sz:12,cls:'b-critical'}
+};
+
+// ── MAP INIT ─────────────────────────────────────────────────────
+var map = L.map('map',{zoomControl:false}).setView([41.400,2.162],13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  attribution:'© OpenStreetMap contributors',maxZoom:19
+}).addTo(map);
+L.control.zoom({position:'topright'}).addTo(map);
+
+// ── Layer groups ──────────────────────────────────────────────────
+var metroGroup = L.layerGroup().addTo(map);
+var homesGroup = L.layerGroup().addTo(map);
+var zonesGroup = L.layerGroup().addTo(map);
+
+// ── Metro markers ─────────────────────────────────────────────────
+metroData.forEach(function(s){
+  var icon = L.divIcon({
+    html:'<div style="width:18px;height:18px;border-radius:50%;background:#060a06;border:1.5px solid #4ade80;display:flex;align-items:center;justify-content:center;font-size:8px;font-family:Space Grotesk,sans-serif;font-weight:700;color:#4ade80;box-shadow:0 0 7px rgba(74,222,128,.4)">M</div>',
+    iconSize:[18,18],iconAnchor:[9,9],className:''
+  });
+  L.marker([s.lat,s.lon],{icon:icon})
+    .bindPopup('<div class="pu-name">'+s.name+'</div><div class="pu-row">Metro stop</div>',{className:'custom-popup'})
+    .addTo(metroGroup);
+});
+
+// ── Care home markers ─────────────────────────────────────────────
+var allMarkers = [];
+rawHomes.forEach(function(h){
+  var fid=h[0],lat=h[1],lon=h[2],dist=h[3],name=h[4],district=h[5],barri=h[6],addr=h[7],tier=h[8];
+  var t = TIER[tier]||TIER.Critical;
+  var icon = L.divIcon({
+    html:'<div style="width:'+t.sz+'px;height:'+t.sz+'px;border-radius:50%;background:'+t.col+';border:1px solid rgba(255,255,255,.25);box-shadow:0 0 7px '+t.glow+'"></div>',
+    iconSize:[t.sz,t.sz],iconAnchor:[t.sz/2,t.sz/2],className:''
+  });
+  var badge = '<span class="pu-badge '+t.cls+'">'+tier+'</span>';
+  var pop = '<div class="pu-name">'+name+'</div>'
+    +'<div class="pu-row">District: <span>'+district+'</span></div>'
+    +'<div class="pu-row">Barri: <span>'+barri+'</span></div>'
+    +'<div class="pu-row">Address: <span>'+addr+'</span></div>'
+    +'<div class="pu-row">Distance to metro: <span>'+dist.toFixed(0)+' m</span></div>'
+    +'<div class="pu-tier">'+badge+'</div>';
+  var m = L.marker([lat,lon],{icon:icon})
+    .bindPopup(pop,{className:'custom-popup'})
+    .addTo(homesGroup);
+  // 800m zone for excellent
+  if(dist<=400){
+    var z = L.circle([lat,lon],{radius:400,color:'#4ade80',fillColor:'#4ade80',fillOpacity:.03,weight:.7,opacity:.25,dashArray:'4 4'}).addTo(zonesGroup);
+  }
+  allMarkers.push({marker:m,tier:tier,lat:lat,lon:lon,dist:dist,name:name,district:district,barri:barri,addr:addr});
+});
+
+// ── Layer toggles ─────────────────────────────────────────────────
+document.getElementById('tog-metro').addEventListener('change',function(){
+  if(this.checked) metroGroup.addTo(map); else map.removeLayer(metroGroup);
+});
+document.getElementById('tog-homes').addEventListener('change',function(){
+  if(this.checked) homesGroup.addTo(map); else map.removeLayer(homesGroup);
+});
+document.getElementById('tog-zones').addEventListener('change',function(){
+  if(this.checked) zonesGroup.addTo(map); else map.removeLayer(zonesGroup);
+});
+
+// ── Filter pills ──────────────────────────────────────────────────
+document.getElementById('filterRow').addEventListener('click',function(e){
+  var btn = e.target.closest('.fpill'); if(!btn) return;
+  var tier = btn.dataset.tier;
+  document.querySelectorAll('.fpill').forEach(function(b){b.classList.remove('on')});
+  btn.classList.add('on');
+  allMarkers.forEach(function(am){
+    var show = (tier==='all'||am.tier===tier);
+    if(show) am.marker.addTo(homesGroup); else homesGroup.removeLayer(am.marker);
+  });
+  renderHomeList(tier);
+});
+
+// ── District fly-to ───────────────────────────────────────────────
+function flyToDistrict(lat,lon,zoom,idx){
+  map.flyTo([lat,lon],zoom,{duration:1.3});
+  document.querySelectorAll('.rank-card').forEach(function(c,i){c.classList.toggle('active',i===idx)});
+}
+
+// ── Home list panel ───────────────────────────────────────────────
+function renderHomeList(filterTier){
+  var list = document.getElementById('homeList');
+  list.innerHTML='';
+  var homes = allMarkers.filter(function(am){return filterTier==='all'||am.tier===filterTier});
+  homes.sort(function(a,b){return a.dist-b.dist});
+  homes.slice(0,60).forEach(function(am){
+    var t = TIER[am.tier]||TIER.Critical;
+    var div = document.createElement('div');
+    div.className='home-item';
+    div.innerHTML='<div class="hi-dot" style="background:'+t.col+'"></div>'
+      +'<div class="hi-body"><div class="hi-name">'+am.name+'</div>'
+      +'<div class="hi-sub">'+am.barri+' · '+am.district+'</div></div>'
+      +'<div class="hi-dist" style="color:'+t.col+'">'+am.dist.toFixed(0)+'m</div>';
+    div.addEventListener('click',function(){
+      map.flyTo([am.lat,am.lon],16,{duration:1.2});
+      am.marker.openPopup();
+    });
+    list.appendChild(div);
+  });
+  if(homes.length>60){
+    var more = document.createElement('div');
+    more.style.cssText='font-size:9px;color:var(--mut);text-align:center;padding:6px';
+    more.textContent='Showing 60 of '+homes.length+' — apply tier filter to narrow';
+    list.appendChild(more);
+  }
+}
+renderHomeList('all');
+
+// ── CHARTS ───────────────────────────────────────────────────────
+var mc='#4d6b4d', gc='rgba(255,255,255,.05)';
+
+new Chart(document.getElementById('donutChart'),{
+  type:'doughnut',
+  data:{labels:['Excellent','Good','Moderate','Poor','Critical'],
+    datasets:[{data:[54,71,25,32,48],backgroundColor:['#4ade80','#3b82f6','#fbbf24','#f97316','#ef4444'],borderWidth:0,hoverOffset:4}]},
+  options:{responsive:true,maintainAspectRatio:false,cutout:'62%',
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return ' '+c.parsed+' homes ('+Math.round(c.parsed/230*100)+'%)';}}}}}
+});
+
+var allDists=[3256.4,863.9,116.4,267.9,636.1,361.1,1760.3,602.2,2042.4,3353.3,810.8,1644.7,181.5,708.2,506.4,267.9,2106.3,853.0,1887.2,2287.1,125.0,312.7,111.0,1622.1,163.0,2043.1,490.4,2295.2,543.4,1766.5,2938.8,92.9,1374.2,256.7,608.0,222.3,2966.6,541.9,2974.8,860.1,364.1,417.4,388.3,1031.5,2262.7,855.2,312.7,705.9,364.2,3098.0,894.5,871.3,262.6,3016.6,653.8,167.0,3064.7,135.1,334.7,2350.5,261.4,277.9,1015.3,2184.9,355.7,476.4,617.6,3309.4,3325.2,1178.6,3409.1,955.8,1752.7,2747.7,106.4,2902.2,2247.1,2006.7,3141.7,1567.9,1859.7,243.3,2655.3,234.5,351.5,461.6,2764.8,1050.9,297.0,2044.7,1819.7,214.4,924.1,638.0,286.2,69.2,3121.2,396.7,287.7,2197.1,2561.5,3379.2,505.8,1516.8,1358.5,1195.3,4687.3,1444.0,112.4,108.6,2984.5,1984.0,153.1,111.0,600.3,3256.4,643.4,2335.5,774.5,287.7,3365.9,2517.7,4319.6,860.1,1465.0,1646.5,908.9,4778.7,4016.1,993.1,1547.3,366.5,483.8,4714.8,1946.9,380.9,1293.6,3206.2,205.6,541.7,3448.5,1772.5,97.8,498.4,362.5,3309.4,2940.5,2804.9,256.7,2591.4,527.4,804.6,2050.2,147.7,300.9,760.6,286.3,700.1,838.5,764.3,659.2,207.4,590.7,1782.4,351.5,241.7,622.9,364.1,357.2,2755.0,6295.4,3256.0,774.9,266.7,1079.5,185.7,2671.8,1670.6,139.9,1018.3,1990.2,2839.5,658.7,2070.6,1907.6,2010.7,107.7,566.2,1007.6,1366.9,2280.8,163.0,826.2,2237.0,2160.5,3009.1,812.8,916.4,3674.3,2776.7,1852.7,1366.9,609.7,358.6,2907.7,181.5,214.4,2036.8,2370.8,2647.0,111.0,111.0,3878.2,2390.9,1029.7,2457.9,3774.9,1052.5,3436.0,1765.9,533.6,111.0,843.5,3061.1,3308.0,3308.0,2941.9,2733.4,4545.5,1687.9];
+var hBins=new Array(13).fill(0);
+allDists.forEach(function(d){hBins[Math.min(Math.floor(d/500),12)]++;});
+var hCols=hBins.map(function(_,i){var m=(i+.5)*500;return m<=400?'#4ade80':m<=800?'#3b82f6':m<=1200?'#fbbf24':m<=2000?'#f97316':'#ef4444';});
+new Chart(document.getElementById('histChart'),{
+  type:'bar',
+  data:{labels:['0–.5k','.5–1k','1–1.5k','1.5–2k','2–2.5k','2.5–3k','3–3.5k','3.5–4k','4–4.5k','4.5–5k','5–5.5k','5.5–6k','6k+'],
+    datasets:[{data:hBins,backgroundColor:hCols,borderRadius:3,borderSkipped:false}]},
+  options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return ' '+c.parsed.y+' homes';}}}},
+    scales:{x:{ticks:{color:mc,font:{size:8,family:'DM Mono'},maxRotation:45,autoSkip:false},grid:{color:gc},border:{display:false}},
+      y:{ticks:{color:mc,font:{size:9}},grid:{color:gc},border:{display:false}}}}
+});
+
+new Chart(document.getElementById('radarChart'),{
+  type:'radar',
+  data:{labels:['Ciutat\nVella','Eixample','Sants-\nMontjuïc','Gràcia','Les\nCorts','Sant\nMartí','Horta-\nGuinardó','Sarrià-\nSG','Sant\nAndreu','Nou\nBarris'],
+    datasets:[
+      {label:'Access score',data:[95,86,72,55,40,38,20,15,10,5],backgroundColor:'rgba(74,222,128,.08)',borderColor:'#4ade80',borderWidth:1.5,pointRadius:2,pointBackgroundColor:'#4ade80'},
+      {label:'Critical count',data:[0,0,0,12,33,11,67,78,100,100],backgroundColor:'rgba(239,68,68,.06)',borderColor:'#ef4444',borderWidth:1,borderDash:[3,3],pointRadius:2,pointBackgroundColor:'#ef4444'}
+    ]},
+  options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{r:{ticks:{color:mc,font:{size:7},stepSize:20,backdropColor:'transparent'},
+      pointLabels:{color:'#6b7c6b',font:{size:8,family:'DM Mono'}},
+      grid:{color:'rgba(255,255,255,.05)'},angleLines:{color:'rgba(255,255,255,.05)'},min:0,max:100}}}
+});
+
+new Chart(document.getElementById('critChart'),{
+  type:'bar',
+  data:{labels:['Vallbona\n6,295m','Trinitat\n4,779m','Bon\nPastor\n4,715m','Palamós\n4,545m','Edelweiss\nVallvid.\n4,687m','Molí\nVia Fav.\n4,320m','Vil·la\nMagda\n4,016m'],
+    datasets:[{data:[6295,4779,4715,4545,4687,4320,4016],backgroundColor:['#7f1d1d','#991b1b','#b91c1c','#dc2626','#ef4444','#f87171','#fca5a5'],borderRadius:3,borderSkipped:false}]},
+  options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return ' '+Math.round(c.parsed.y).toLocaleString()+' m';}}},
+    scales:{x:{ticks:{color:mc,font:{size:8,family:'DM Mono'},maxRotation:0},grid:{display:false},border:{display:false}},
+      y:{ticks:{color:mc,font:{size:9},callback:function(v){return (v/1000).toFixed(1)+'km';}},grid:{color:gc},border:{display:false}}}}
+  }
+});
+
+new Chart(document.getElementById('bldgChart'),{
+  type:'bar',
+  data:{labels:['Outside\ncoverage','Excellent\n≤400m','Good\n400–800m','Moderate\n800–1200m','Poor\n1.2–2km','Critical\n>2km'],
+    datasets:[{data:[8613,16241,9561,4804,12365,18394],backgroundColor:['#2a2a2a','#4ade80','#3b82f6','#fbbf24','#f97316','#ef4444'],borderRadius:3,borderSkipped:false}]},
+  options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return ' '+Math.round(c.parsed.y).toLocaleString()+' buildings ('+Math.round(c.parsed.y/69978*100)+'%)';}}}},
+    scales:{x:{ticks:{color:mc,font:{size:8},maxRotation:0},grid:{display:false},border:{display:false}},
+      y:{ticks:{color:mc,font:{size:9},callback:function(v){return (v/1000).toFixed(0)+'k';}},grid:{color:gc},border:{display:false}}}}
+});
+</script>
+</body>
+</html>
